@@ -1,0 +1,150 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows-arm64"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  RESTAURANT
+  CAPTAIN
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PREPARING
+  READY_FOR_PICKUP
+  CAPTAIN_ASSIGNED
+  PICKED_UP
+  DELIVERING
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentProvider {
+  HUAWEI_IAP
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant?
+  captain    Captain?
+  orders     Order[]     @relation("CustomerOrders")
+}
+
+model Restaurant {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  logoUrl     String?
+  lat         Float
+  lng         Float
+  address     String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  products Product[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  price        Float
+  imageUrl     String?
+  category     String
+  mealType     MealType
+  isAvailable  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  orderItems OrderItem[]
+}
+
+model Captain {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle   String?
+  isOnline  Boolean  @default(false)
+  lat       Float?
+  lng       Float?
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  customerId      String
+  customer        User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  captainId       String?
+  captain         Captain?    @relation(fields: [captainId], references: [id])
+  status          OrderStatus @default(PENDING_PAYMENT)
+  deliveryLat     Float
+  deliveryLng     Float
+  deliveryAddress String
+  subtotal        Float
+  deliveryFee     Float
+  total           Float
+  hiddenByCustomer Boolean     @default(false)
+  hiddenByCaptain  Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items    OrderItem[]
+  payment  Payment?
+}
+
+model OrderItem {
+  id           String @id @default(cuid())
+  orderId      String
+  order        Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  restaurantId String
+  productId    String
+  product      Product @relation(fields: [productId], references: [id])
+  quantity     Int
+  unitPrice    Float
+  lineTotal    Float
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  orderId           String          @unique
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider          PaymentProvider @default(HUAWEI_IAP)
+  status            PaymentStatus   @default(PENDING)
+  huaweiPurchaseId  String?
+  huaweiProductId   String?
+  amount            Float
+  currency          String          @default("SAR")
+  verifiedAt        DateTime?
+  createdAt         DateTime        @default(now())
+}
