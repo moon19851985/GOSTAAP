@@ -41,9 +41,12 @@ import {
 import {
   notifyCaptainNewOrder,
   registerCaptainPushToken,
+  subscribeCaptainInAppAlerts,
   unregisterCaptainPushToken,
+  type CaptainInAppAlert,
   type DispatchOfferPayload,
 } from "../src/lib/captainNotifications";
+import { CaptainInAppAlertBanner } from "../src/components/CaptainInAppAlertBanner";
 
 type OrderItem = {
   productName?: string;
@@ -261,6 +264,7 @@ export default function CaptainScreen() {
   const prevOffersCount = useRef(0);
   const autoLocationTried = useRef(false);
   const browserOnHttp = Platform.OS === "web" && !webAllowsGps();
+  const [inAppAlert, setInAppAlert] = useState<CaptainInAppAlert | null>(null);
 
   const loadStats = useCallback(async () => {
     try {
@@ -476,6 +480,21 @@ export default function CaptainScreen() {
     }
     prevOffersCount.current = incomingOffers.length;
   }, [incomingOffers.length]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    return subscribeCaptainInAppAlerts((alert) => {
+      setInAppAlert(alert);
+      setOrderTab("current");
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!inAppAlert) return;
+    const hideId = setTimeout(() => setInAppAlert(null), 10_000);
+    return () => clearTimeout(hideId);
+  }, [inAppAlert]);
 
   useEffect(() => {
     if (ready && orderTab === "delivered") loadCompleted();
@@ -706,13 +725,29 @@ export default function CaptainScreen() {
 
   if (!ready) return null;
 
+  const dismissInAppAlert = () => setInAppAlert(null);
+  const openOfferFromAlert = () => {
+    dismissInAppAlert();
+    setOrderTab("current");
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   return (
-    <ScrollView
-      ref={scrollRef}
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
+    <View style={styles.screen}>
+      {inAppAlert ? (
+        <CaptainInAppAlertBanner
+          title={inAppAlert.title}
+          body={inAppAlert.body}
+          onPress={openOfferFromAlert}
+          onDismiss={dismissInAppAlert}
+        />
+      ) : null}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.container}
+        contentContainerStyle={[styles.content, inAppAlert ? styles.contentWithBanner : null]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
       <View style={styles.headerCenter}>
         <Pressable onPress={() => router.replace("/")} hitSlop={8}>
           <Text style={styles.homeLink}>الرئيسية</Text>
@@ -987,12 +1022,15 @@ export default function CaptainScreen() {
         onSaved={applyCaptainLocation}
       />
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   container: { flex: 1 },
   content: { padding: 16, paddingTop: 48, paddingBottom: 32 },
+  contentWithBanner: { paddingTop: 100 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   checkingText: { color: "#666" },
   headerCenter: {
