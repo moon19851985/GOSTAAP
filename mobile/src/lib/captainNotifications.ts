@@ -19,6 +19,26 @@ export type DispatchOfferPayload = {
   total?: number;
 };
 
+export type CaptainInAppAlert = {
+  title: string;
+  body: string;
+  orderId?: string;
+};
+
+const inAppAlertListeners = new Set<(alert: CaptainInAppAlert) => void>();
+
+/** اشتراك في تنبيهات داخل التطبيق (ويب) — بدون إشعارات نظام المتصفح */
+export function subscribeCaptainInAppAlerts(listener: (alert: CaptainInAppAlert) => void) {
+  inAppAlertListeners.add(listener);
+  return () => {
+    inAppAlertListeners.delete(listener);
+  };
+}
+
+function emitCaptainInAppAlert(alert: CaptainInAppAlert) {
+  inAppAlertListeners.forEach((listener) => listener(alert));
+}
+
 export function configureCaptainNotificationHandler() {
   if (handlerConfigured) return;
   handlerConfigured = true;
@@ -72,16 +92,11 @@ async function notifyWeb(payload: DispatchOfferPayload) {
   if (Platform.OS !== "web" || typeof window === "undefined") return;
 
   const body = buildOfferBody(payload);
-  if (typeof Notification !== "undefined") {
-    if (Notification.permission === "granted") {
-      new Notification("طلب توصيل جديد", { body, tag: payload.orderId });
-    } else if (Notification.permission !== "denied") {
-      const perm = await Notification.requestPermission();
-      if (perm === "granted") {
-        new Notification("طلب توصيل جديد", { body, tag: payload.orderId });
-      }
-    }
-  }
+  emitCaptainInAppAlert({
+    title: "طلب توصيل جديد",
+    body,
+    orderId: payload.orderId,
+  });
 
   try {
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -133,9 +148,6 @@ export async function notifyCaptainNewOrder(payload: DispatchOfferPayload) {
 /** تسجيل رمز Expo Push على الخادم — للإشعار حتى لو التطبيق مغلق */
 export async function registerCaptainPushToken(): Promise<boolean> {
   if (Platform.OS === "web") {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      await Notification.requestPermission();
-    }
     return false;
   }
 
