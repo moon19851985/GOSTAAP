@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "export:web": "expo export --platform web",
     "android": "expo run:android",
     "prebuild": "expo prebuild --platform android",
     "prebuild:android": "expo prebuild --platform android --clean",
