@@ -37,10 +37,6 @@ app.use("/uploads", express.static(uploadDir));
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "gostasrv-api" }));
 
-app.get("/", (_req, res) => {
-  res.redirect("/api/auth/login");
-});
-
 app.use("/api/auth", authRoutes);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/orders", orderRoutes);
@@ -50,6 +46,15 @@ app.use("/api/captain", captainRoutes);
 app.use("/api/promotions", promotionRoutes);
 app.use("/api/favorites", favoritesRoutes);
 app.use("/api/admin", adminRoutes);
+
+const publicDir = path.join(__dirname, "../public");
+const webIndex = path.join(publicDir, "index.html");
+if (fs.existsSync(webIndex)) {
+  app.use(express.static(publicDir));
+  app.get(/^(?!\/api\/|\/health|\/uploads\/).*/, (_req, res) => {
+    res.sendFile(webIndex);
+  });
+}
 
 const port = Number(process.env.PORT ?? 4000);
 const server = http.createServer(app);
