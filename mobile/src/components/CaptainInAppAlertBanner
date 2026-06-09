@@ -1,0 +1,93 @@
+import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
+
+type Props = {
+  title: string;
+  body: string;
+  onPress: () => void;
+  onDismiss: () => void;
+};
+
+export function CaptainInAppAlertBanner({ title, body, onPress, onDismiss }: Props) {
+  if (Platform.OS !== "web") return null;
+
+  return (
+    <View style={styles.wrap} accessibilityRole="alert">
+      <Pressable style={styles.banner} onPress={onPress}>
+        <Text style={styles.icon}>🔔</Text>
+        <View style={styles.textBlock}>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.body} numberOfLines={2}>
+            {body}
+          </Text>
+          <Text style={styles.hint}>اضغط لعرض الطلب</Text>
+        </View>
+      </Pressable>
+      <Pressable style={styles.dismiss} onPress={onDismiss} hitSlop={12} accessibilityLabel="إغلاق">
+        <Text style={styles.dismissText}>✕</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+    ...(Platform.OS === "web"
+      ? ({ boxShadow: "0 4px 20px rgba(0,0,0,0.25)" } as object)
+      : {}),
+  },
+  banner: {
+    flex: 1,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#0077B6",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 2,
+    borderColor: "#F5C518",
+  },
+  icon: { fontSize: 28 },
+  textBlock: { flex: 1 },
+  title: {
+    color: "#FFF",
+    fontWeight: "800",
+    fontSize: 16,
+    textAlign: "right",
+    marginBottom: 4,
+  },
+  body: {
+    color: "#E8F4F8",
+    fontSize: 14,
+    textAlign: "right",
+    lineHeight: 20,
+  },
+  hint: {
+    color: "#F5C518",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+    marginTop: 6,
+  },
+  dismiss: {
+    marginRight: 8,
+    marginTop: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dismissText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+});
