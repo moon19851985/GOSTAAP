@@ -5,7 +5,11 @@ import { fileURLToPath } from "url";
 import { resolveCityFromCoords } from "./lib/cities.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = process.env.DATABASE_PATH ?? path.join(__dirname, "../data/app.db");
+const defaultDbPath =
+  process.env.NODE_ENV === "production"
+    ? "/var/data/app.db"
+    : path.join(__dirname, "../data/app.db");
+const dbPath = process.env.DATABASE_PATH ?? defaultDbPath;
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 export const db = new Database(dbPath);
@@ -128,6 +132,13 @@ export function initDb() {
   migrateOrderDispatch();
   migrateCaptainPushToken();
   migratePayoutRecord();
+  migrateUserPhoneUnique();
+}
+
+function migrateUserPhoneUnique() {
+  db.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS User_phone_unique ON User(phone) WHERE phone IS NOT NULL AND phone != ''`
+  );
 }
 
 function migrateCaptainPushToken() {
