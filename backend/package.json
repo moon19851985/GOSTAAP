@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "npm install --include=dev && tsc",
+    "build": "npm install --include=dev && tsc && node scripts/build-web.mjs",
+    "build:web": "node scripts/build-web.mjs",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "db:wipe-users": "tsx scripts/wipe-registered-data.ts"
