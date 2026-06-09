@@ -37,6 +37,10 @@ app.use("/uploads", express.static(uploadDir));
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "gostasrv-api" }));
 
+app.get("/", (_req, res) => {
+  res.redirect("/api/auth/login");
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/orders", orderRoutes);
