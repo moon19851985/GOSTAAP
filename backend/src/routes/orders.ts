@@ -20,6 +20,10 @@ import { effectiveUnitPrice } from "../lib/promotions.js";
 
 const router = Router();
 
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 const checkoutSchema = z.object({
   items: z.array(z.object({ productId: z.string(), quantity: z.number().int().min(1) })).min(1),
   deliveryLat: z.number(),
@@ -130,7 +134,7 @@ router.get("/my", authMiddleware(["CUSTOMER"]), (req, res) => {
 router.delete("/:id", authMiddleware(["CUSTOMER"]), (req, res) => {
   const order = db
     .prepare(`SELECT id, status, customerId FROM "Order" WHERE id = ? AND customerId = ?`)
-    .get(req.params.id, req.user!.sub) as { id: string; status: string } | undefined;
+    .get(routeParam(req.params.id), req.user!.sub) as { id: string; status: string } | undefined;
 
   if (!order) {
     res.status(404).json({ error: "الطلب غير موجود" });
@@ -143,7 +147,7 @@ router.delete("/:id", authMiddleware(["CUSTOMER"]), (req, res) => {
   }
 
   db.prepare(`UPDATE "Order" SET hiddenByCustomer = 1, updatedAt = datetime('now') WHERE id = ?`).run(
-    req.params.id
+    routeParam(req.params.id)
   );
 
   res.json({ ok: true, message: "تم حذف الطلب من قائمتك" });
@@ -161,9 +165,9 @@ router.get("/restaurant/stats", authMiddleware(["RESTAURANT"]), (req, res) => {
   const period = typeof req.query.period === "string" ? req.query.period : "all";
   const { sql: periodClause, params: periodParams } = periodSql("o.createdAt", {
     period,
-    month: req.query.month,
-    year: req.query.year,
-    date: req.query.date,
+    month: typeof req.query.month === "string" ? req.query.month : undefined,
+    year: typeof req.query.year === "string" ? req.query.year : undefined,
+    date: typeof req.query.date === "string" ? req.query.date : undefined,
   });
 
   const row = db
@@ -237,7 +241,7 @@ router.patch("/restaurant/:orderId/status", authMiddleware(["RESTAURANT"]), (req
          SELECT 1 FROM OrderItem oi WHERE oi.orderId = o.id AND oi.restaurantId = ?
        )`
     )
-    .get(req.params.orderId, restaurant.id) as
+    .get(routeParam(req.params.orderId), restaurant.id) as
     | { id: string; status: string; captainId: string | null }
     | undefined;
 
@@ -268,29 +272,29 @@ router.patch("/restaurant/:orderId/status", authMiddleware(["RESTAURANT"]), (req
   if (status === "PICKED_UP") {
     db.prepare(
       `UPDATE "Order" SET status = ?, updatedAt = datetime('now'), pickedUpAt = datetime('now') WHERE id = ?`
-    ).run(status, req.params.orderId);
+    ).run(status, routeParam(req.params.orderId));
   } else {
     db.prepare(`UPDATE "Order" SET status = ?, updatedAt = datetime('now') WHERE id = ?`).run(
       status,
-      req.params.orderId
+      routeParam(req.params.orderId)
     );
   }
 
   if (status === "READY_FOR_PICKUP") {
-    notifyCaptainsOrderReady(req.params.orderId);
+    notifyCaptainsOrderReady(routeParam(req.params.orderId));
   }
 
   if (status === "PICKED_UP") {
-    getIo()?.to(`order:${req.params.orderId}`).emit("order:status", {
-      orderId: req.params.orderId,
+    getIo()?.to(`order:${routeParam(req.params.orderId)}`).emit("order:status", {
+      orderId: routeParam(req.params.orderId),
       status: "PICKED_UP",
     });
   }
 
-  notifyRestaurantOrderUpdate(req.params.orderId);
-  notifyCaptainsOrderUpdate(req.params.orderId);
+  notifyRestaurantOrderUpdate(routeParam(req.params.orderId));
+  notifyCaptainsOrderUpdate(routeParam(req.params.orderId));
 
-  const updated = db.prepare(`SELECT * FROM "Order" WHERE id = ?`).get(req.params.orderId);
+  const updated = db.prepare(`SELECT * FROM "Order" WHERE id = ?`).get(routeParam(req.params.orderId));
   res.json({ order: updated });
 });
 
@@ -332,36 +336,36 @@ router.post("/captain/:orderId/accept", authMiddleware(["CAPTAIN"]), (req, res) 
 
   const existing = db
     .prepare(`SELECT id, status FROM "Order" WHERE id = ? AND captainId IS NULL`)
-    .get(req.params.orderId) as { id: string; status: string } | undefined;
+    .get(routeParam(req.params.orderId)) as { id: string; status: string } | undefined;
 
   if (!existing || !["PAID", "PREPARING", "READY_FOR_PICKUP"].includes(existing.status)) {
     res.status(409).json({ error: "الطلب غير متاح أو تم قبوله من كابتن آخر" });
     return;
   }
 
-  const acceptCheck = captainCanAcceptOrder(req.params.orderId, captain.id);
+  const acceptCheck = captainCanAcceptOrder(routeParam(req.params.orderId), captain.id);
   if (!acceptCheck.ok) {
     res.status(409).json({ error: acceptCheck.error });
     return;
   }
 
-  completeDispatchAccept(req.params.orderId, captain.id);
+  completeDispatchAccept(routeParam(req.params.orderId), captain.id);
 
   db.prepare(`UPDATE "Order" SET captainId = ?, updatedAt = datetime('now') WHERE id = ?`).run(
     captain.id,
-    req.params.orderId
+    routeParam(req.params.orderId)
   );
 
-  getIo()?.to(`order:${req.params.orderId}`).emit("order:status", {
-    orderId: req.params.orderId,
+  getIo()?.to(`order:${routeParam(req.params.orderId)}`).emit("order:status", {
+    orderId: routeParam(req.params.orderId),
     status: existing.status,
     captain: getCaptainPublicProfile(captain.id),
   });
 
-  notifyRestaurantOrderUpdate(req.params.orderId);
-  notifyCaptainsOrderUpdate(req.params.orderId);
+  notifyRestaurantOrderUpdate(routeParam(req.params.orderId));
+  notifyCaptainsOrderUpdate(routeParam(req.params.orderId));
 
-  const order = db.prepare(`SELECT * FROM "Order" WHERE id = ?`).get(req.params.orderId);
+  const order = db.prepare(`SELECT * FROM "Order" WHERE id = ?`).get(routeParam(req.params.orderId));
   res.json({ order, message: "تم قبول الطلب — توجه للمطعم" });
 });
 
@@ -370,20 +374,20 @@ router.post("/captain/:orderId/reject", authMiddleware(["CAPTAIN"]), (req, res) 
 
   const existing = db
     .prepare(`SELECT id, status, captainId FROM "Order" WHERE id = ?`)
-    .get(req.params.orderId) as { id: string; status: string; captainId: string | null } | undefined;
+    .get(routeParam(req.params.orderId)) as { id: string; status: string; captainId: string | null } | undefined;
 
   if (!existing || existing.captainId) {
     res.status(409).json({ error: "الطلب غير متاح" });
     return;
   }
 
-  const acceptCheck = captainCanAcceptOrder(req.params.orderId, captain.id);
+  const acceptCheck = captainCanAcceptOrder(routeParam(req.params.orderId), captain.id);
   if (!acceptCheck.ok) {
     res.status(409).json({ error: acceptCheck.error });
     return;
   }
 
-  rejectDispatchOffer(req.params.orderId, captain.id);
+  rejectDispatchOffer(routeParam(req.params.orderId), captain.id);
   res.json({ ok: true, message: "تم الرفض — سيُعرض على الكابتن التالي" });
 });
 
@@ -392,9 +396,9 @@ router.get("/captain/stats", authMiddleware(["CAPTAIN"]), (req, res) => {
   const period = typeof req.query.period === "string" ? req.query.period : "all";
   const { sql: periodClause, params: periodParams } = periodSql("updatedAt", {
     period,
-    month: req.query.month,
-    year: req.query.year,
-    date: req.query.date,
+    month: typeof req.query.month === "string" ? req.query.month : undefined,
+    year: typeof req.query.year === "string" ? req.query.year : undefined,
+    date: typeof req.query.date === "string" ? req.query.date : undefined,
   });
 
   const row = db
@@ -445,7 +449,7 @@ router.delete("/captain/:orderId", authMiddleware(["CAPTAIN"]), (req, res) => {
   const captain = getOrCreateCaptain(req.user!.sub);
   const order = db
     .prepare(`SELECT id, status FROM "Order" WHERE id = ? AND captainId = ?`)
-    .get(req.params.orderId, captain.id) as { id: string; status: string } | undefined;
+    .get(routeParam(req.params.orderId), captain.id) as { id: string; status: string } | undefined;
 
   if (!order) {
     res.status(404).json({ error: "الطلب غير موجود أو لا يخصك" });
@@ -458,7 +462,7 @@ router.delete("/captain/:orderId", authMiddleware(["CAPTAIN"]), (req, res) => {
   }
 
   db.prepare(`UPDATE "Order" SET hiddenByCaptain = 1, updatedAt = datetime('now') WHERE id = ?`).run(
-    req.params.orderId
+    routeParam(req.params.orderId)
   );
 
   res.json({ ok: true, message: "تم حذف الطلب من قائمتك" });
@@ -479,7 +483,7 @@ router.patch("/captain/:orderId/status", authMiddleware(["CAPTAIN"]), (req, res)
   const captain = getOrCreateCaptain(req.user!.sub);
   const order = db
     .prepare(`SELECT * FROM "Order" WHERE id = ? AND captainId = ?`)
-    .get(req.params.orderId, captain.id) as { id: string; status: string } | undefined;
+    .get(routeParam(req.params.orderId), captain.id) as { id: string; status: string } | undefined;
 
   if (!order) {
     res.status(404).json({ error: "الطلب غير موجود أو لا يخصك" });
@@ -494,29 +498,29 @@ router.patch("/captain/:orderId/status", authMiddleware(["CAPTAIN"]), (req, res)
   if (status === "DELIVERED") {
     db.prepare(
       `UPDATE "Order" SET status = ?, updatedAt = datetime('now'), deliveredAt = datetime('now') WHERE id = ?`
-    ).run(status, req.params.orderId);
+    ).run(status, routeParam(req.params.orderId));
   } else {
     db.prepare(`UPDATE "Order" SET status = ?, updatedAt = datetime('now') WHERE id = ?`).run(
       status,
-      req.params.orderId
+      routeParam(req.params.orderId)
     );
   }
 
-  getIo()?.to(`order:${req.params.orderId}`).emit("order:status", {
-    orderId: req.params.orderId,
+  getIo()?.to(`order:${routeParam(req.params.orderId)}`).emit("order:status", {
+    orderId: routeParam(req.params.orderId),
     status,
   });
 
-  notifyRestaurantOrderUpdate(req.params.orderId);
+  notifyRestaurantOrderUpdate(routeParam(req.params.orderId));
 
-  const updated = db.prepare(`SELECT * FROM "Order" WHERE id = ?`).get(req.params.orderId);
+  const updated = db.prepare(`SELECT * FROM "Order" WHERE id = ?`).get(routeParam(req.params.orderId));
   res.json({ order: updated });
 });
 
 router.get("/:id/invoice", authMiddleware(["CUSTOMER"]), (req, res) => {
   const order = db
     .prepare(`SELECT * FROM "Order" WHERE id = ? AND customerId = ?`)
-    .get(req.params.id, req.user!.sub) as Record<string, unknown> | undefined;
+    .get(routeParam(req.params.id), req.user!.sub) as Record<string, unknown> | undefined;
 
   if (!order) {
     res.status(404).json({ error: "الطلب غير موجود" });
@@ -532,7 +536,7 @@ router.get("/:id/invoice", authMiddleware(["CUSTOMER"]), (req, res) => {
        WHERE oi.orderId = ?
        ORDER BY r.name ASC, p.name ASC`
     )
-    .all(req.params.id);
+    .all(routeParam(req.params.id));
 
   const locked = attachLockedOrderMoney(order);
   res.json({
@@ -551,7 +555,7 @@ router.get("/:id/invoice", authMiddleware(["CUSTOMER"]), (req, res) => {
 router.get("/:id/track", authMiddleware(["CUSTOMER"]), (req, res) => {
   const order = db
     .prepare(`SELECT * FROM "Order" WHERE id = ? AND customerId = ?`)
-    .get(req.params.id, req.user!.sub) as Record<string, unknown> | undefined;
+    .get(routeParam(req.params.id), req.user!.sub) as Record<string, unknown> | undefined;
 
   if (!order) {
     res.status(404).json({ error: "الطلب غير موجود" });
@@ -565,7 +569,7 @@ router.get("/:id/track", authMiddleware(["CUSTOMER"]), (req, res) => {
       `SELECT DISTINCT r.id, r.name, r.lat, r.lng
        FROM OrderItem oi JOIN Restaurant r ON r.id = oi.restaurantId WHERE oi.orderId = ?`
     )
-    .all(req.params.id);
+    .all(routeParam(req.params.id));
 
   res.json({
     orderId: order.id,
