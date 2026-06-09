@@ -7,8 +7,12 @@ function resolveApiUrl(): string {
   const fromConfig = Constants.expoConfig?.extra?.apiUrl as string | undefined;
   const appEnv = Constants.expoConfig?.extra?.appEnv as string | undefined;
 
+  if (appEnv === "production" && Platform.OS === "web" && typeof window !== "undefined") {
+    return window.location.origin.replace(/\/$/, "");
+  }
+
   if (appEnv === "production" && fromConfig) {
-    return fromConfig;
+    return fromConfig.replace(/\/$/, "");
   }
 
   if (Platform.OS === "web" && typeof window !== "undefined") {
