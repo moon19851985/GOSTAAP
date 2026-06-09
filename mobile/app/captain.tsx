@@ -46,7 +46,6 @@ import {
   type CaptainInAppAlert,
   type DispatchOfferPayload,
 } from "../src/lib/captainNotifications";
-import { CaptainInAppAlertBanner } from "../src/components/CaptainInAppAlertBanner";
 
 type OrderItem = {
   productName?: string;
@@ -233,6 +232,43 @@ type DispatchOffer = {
   order: Order;
   priorityEndsAt: string | null;
 };
+
+function CaptainInAppAlertBanner({
+  title,
+  body,
+  onPress,
+  onDismiss,
+}: {
+  title: string;
+  body: string;
+  onPress: () => void;
+  onDismiss: () => void;
+}) {
+  if (Platform.OS !== "web") return null;
+
+  return (
+    <View style={bannerStyles.wrap} accessibilityRole="alert">
+      <Pressable style={bannerStyles.banner} onPress={onPress}>
+        <Text style={bannerStyles.icon}>🔔</Text>
+        <View style={bannerStyles.textBlock}>
+          <Text style={bannerStyles.title}>{title}</Text>
+          <Text style={bannerStyles.body} numberOfLines={2}>
+            {body}
+          </Text>
+          <Text style={bannerStyles.hint}>اضغط لعرض الطلب</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        style={bannerStyles.dismiss}
+        onPress={onDismiss}
+        hitSlop={12}
+        accessibilityLabel="إغلاق"
+      >
+        <Text style={bannerStyles.dismissText}>✕</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function CaptainScreen() {
   const router = useRouter();
@@ -1267,4 +1303,67 @@ const styles = StyleSheet.create({
   btnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
   disabled: { opacity: 0.6 },
   empty: { textAlign: "center", marginVertical: 24, color: "#888", lineHeight: 22 },
+});
+
+const bannerStyles = StyleSheet.create({
+  wrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+    ...(Platform.OS === "web"
+      ? ({ boxShadow: "0 4px 20px rgba(0,0,0,0.25)" } as object)
+      : {}),
+  },
+  banner: {
+    flex: 1,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#0077B6",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 2,
+    borderColor: "#F5C518",
+  },
+  icon: { fontSize: 28 },
+  textBlock: { flex: 1 },
+  title: {
+    color: "#FFF",
+    fontWeight: "800",
+    fontSize: 16,
+    textAlign: "right",
+    marginBottom: 4,
+  },
+  body: {
+    color: "#E8F4F8",
+    fontSize: 14,
+    textAlign: "right",
+    lineHeight: 20,
+  },
+  hint: {
+    color: "#F5C518",
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+    marginTop: 6,
+  },
+  dismiss: {
+    marginRight: 8,
+    marginTop: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dismissText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
 });
