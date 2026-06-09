@@ -107,7 +107,7 @@ router.get("/slot-counts", (req, res) => {
     OFFER_SLOTS.map((slot) => [slot, 0])
   ) as Record<OfferSlot, number>;
   for (const slot of OFFER_SLOTS) {
-    counts[slot] = fetchPromotionRows(city, slot).length;
+    counts[slot] = fetchPromotionRows(city ?? undefined, slot).length;
   }
   res.json({ counts, city });
 });
@@ -115,7 +115,7 @@ router.get("/slot-counts", (req, res) => {
 router.get("/", (req, res) => {
   const city = cityNameFromQuery(req.query.city as string | undefined);
   const slot = parseOfferSlot(req.query.slot as string | undefined);
-  const rows = fetchPromotionRows(city, slot);
+  const rows = fetchPromotionRows(city ?? undefined, slot);
   res.json({ promotions: rows.map(enrichPromotion), city, slot });
 });
 
