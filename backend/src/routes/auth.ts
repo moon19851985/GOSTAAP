@@ -9,6 +9,7 @@ import {
 } from "../lib/otp.js";
 import { getOrCreateCaptain } from "../lib/captain.js";
 import { resolveCityFromCoords } from "../lib/cities.js";
+import { normalizePhone, phoneUsedByOther } from "../lib/phone.js";
 
 const router = Router();
 
@@ -89,6 +90,11 @@ router.patch("/me", authMiddleware(), async (req, res) => {
       res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
       return;
     }
+  }
+
+  if (phone && phoneUsedByOther(phone, user.id)) {
+    res.status(409).json({ error: "رقم الجوال مستخدم مسبقاً" });
+    return;
   }
 
   if (restaurant && user.role !== "RESTAURANT") {
@@ -212,13 +218,6 @@ const phoneSchema = z
     return digits.length >= 9 && digits.length <= 15;
   }, "رقم جوال غير صالح (9 أرقام على الأقل)");
 
-function normalizePhone(phone: string) {
-  let digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("966")) digits = digits.slice(3);
-  if (digits.startsWith("0")) digits = digits.slice(1);
-  return digits;
-}
-
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -276,8 +275,22 @@ router.post("/register", async (req, res) => {
     | { id: string; emailVerified: number }
     | undefined;
 
-  if (exists?.emailVerified === 1) {
-    res.status(409).json({ error: "البريد مستخدم مسبقاً" });
+  if (exists) {
+    if (exists.emailVerified === 1) {
+      res.status(409).json({ error: "البريد مستخدم مسبقاً" });
+      return;
+    }
+    res.status(409).json({
+      error: "هذا البريد مسجّل ولم يُفعَّل بعد. أدخل كود التفعيل أو أعد إرساله.",
+      needsVerification: true,
+      email: emailNorm,
+    });
+    return;
+  }
+
+  const phoneNorm = normalizePhone(phone);
+  if (phoneUsedByOther(phoneNorm)) {
+    res.status(409).json({ error: "رقم الجوال مستخدم مسبقاً" });
     return;
   }
 
@@ -287,21 +300,12 @@ router.post("/register", async (req, res) => {
   }
 
   const passwordHash = await hashPassword(password);
-  const userId = exists?.id ?? cuid();
-  const phoneNorm = normalizePhone(phone);
+  const userId = cuid();
 
   const tx = db.transaction(() => {
-    if (exists) {
-      db.prepare(
-        `UPDATE User SET passwordHash = ?, name = ?, phone = ?, role = ?, emailVerified = 0 WHERE id = ?`
-      ).run(passwordHash, name, phoneNorm, role, userId);
-      db.prepare(`DELETE FROM Restaurant WHERE userId = ?`).run(userId);
-      db.prepare(`DELETE FROM Captain WHERE userId = ?`).run(userId);
-    } else {
-      db.prepare(
-        `INSERT INTO User (id, email, passwordHash, name, phone, role, emailVerified) VALUES (?, ?, ?, ?, ?, ?, 0)`
-      ).run(userId, emailNorm, passwordHash, name, phoneNorm, role);
-    }
+    db.prepare(
+      `INSERT INTO User (id, email, passwordHash, name, phone, role, emailVerified) VALUES (?, ?, ?, ?, ?, ?, 0)`
+    ).run(userId, emailNorm, passwordHash, name, phoneNorm, role);
 
     if (role === "RESTAURANT" && restaurant) {
       const city = resolveCityFromCoords(restaurant.lat, restaurant.lng).nameAr;
