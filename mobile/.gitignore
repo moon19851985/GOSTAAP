@@ -1,0 +1,16 @@
+# توقيع الإصدار — لا ترفع للمستودع
+keystore.properties
+credentials/*
+!credentials/README.md
+*.jks
+*.keystore
+*.p12
+
+.env.production
+agconnect-services.json
+
+# Expo / Android
+android/
+ios/
+.expo/
+dist/
