@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { requestWebGpsOnUserGesture, webAllowsGps } from "../lib/customerLocation";
 import {
@@ -48,6 +48,14 @@ map.on('click', function(e) {
   marker.setLatLng(e.latlng);
   send();
 });
+window.addEventListener('message', function(e) {
+  var d = e.data;
+  if (d && d.type === 'gostasrv-picker-move' && typeof d.lat === 'number' && typeof d.lng === 'number') {
+    marker.setLatLng([d.lat, d.lng]);
+    pos.lat = d.lat;
+    pos.lng = d.lng;
+  }
+});
 </script></body></html>`;
 }
 
@@ -59,26 +67,33 @@ export function LocationPicker({
   hideAutoButton = false,
   label = "📍 حدّد موقعك على الخريطة",
 }: Props) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const initialPos = useRef({ lat, lng });
   const [display, setDisplay] = useState({ lat, lng });
   const [gpsHint, setGpsHint] = useState<string | null>(null);
-  const [mapKey, setMapKey] = useState(0);
-  const skipRemount = useRef(false);
+
+  const srcDoc = useMemo(
+    () => buildPickerDoc(initialPos.current.lat, initialPos.current.lng),
+    []
+  );
 
   useEffect(() => {
-    if (skipRemount.current) {
-      skipRemount.current = false;
-      setDisplay({ lat, lng });
-      return;
-    }
     setDisplay({ lat, lng });
-    setMapKey((k) => k + 1);
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+
+    const send = () => {
+      win.postMessage({ type: "gostasrv-picker-move", lat, lng }, "*");
+    };
+    send();
+    const t = setTimeout(send, 400);
+    return () => clearTimeout(t);
   }, [lat, lng]);
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       const data = e.data as { type?: string; lat?: number; lng?: number };
       if (data?.type === "gostasrv-location" && typeof data.lat === "number" && typeof data.lng === "number") {
-        skipRemount.current = true;
         setDisplay({ lat: data.lat, lng: data.lng });
         onChange({ lat: data.lat, lng: data.lng });
       }
@@ -86,8 +101,6 @@ export function LocationPicker({
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, [onChange]);
-
-  const srcDoc = buildPickerDoc(display.lat, display.lng);
 
   function useMyLocation() {
     setGpsHint(null);
@@ -100,15 +113,19 @@ export function LocationPicker({
       const next = { lat: result.lat, lng: result.lng };
       setDisplay(next);
       onChange(next);
-      setMapKey((k) => k + 1);
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "gostasrv-picker-move", lat: next.lat, lng: next.lng },
+        "*"
+      );
     });
   }
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.map, { height }]} key={mapKey}>
+      <View style={[styles.map, { height }]}>
         {createElement("iframe", {
+          ref: iframeRef,
           title: "اختيار الموقع",
           srcDoc,
           style: { width: "100%", height: "100%", border: "none", borderRadius: 12 },
