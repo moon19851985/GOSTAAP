@@ -5,11 +5,9 @@ import { fileURLToPath } from "url";
 import { resolveCityFromCoords } from "./lib/cities.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const defaultDbPath =
-  process.env.NODE_ENV === "production"
-    ? "/var/data/app.db"
-    : path.join(__dirname, "../data/app.db");
-const dbPath = process.env.DATABASE_PATH ?? defaultDbPath;
+// محلي و Free على Render: backend/data/app.db — مع قرص دائم: عيّن DATABASE_PATH=/var/data/app.db
+const dbPath =
+  process.env.DATABASE_PATH?.trim() || path.join(__dirname, "../data/app.db");
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 export const db = new Database(dbPath);
