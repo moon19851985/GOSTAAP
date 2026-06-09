@@ -1,4 +1,4 @@
-import { createElement, useMemo } from "react";
+import { createElement, useEffect, useMemo, useRef } from "react";
 import { View, StyleSheet } from "react-native";
 import type { MapLocation } from "./deliveryMapShared";
 import {
@@ -23,7 +23,7 @@ function escapeJs(s: string) {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\n/g, " ");
 }
 
-function buildLeafletDoc(customer: MapLocation, restaurants: MapLocation[], captain?: MapLocation | null) {
+function buildLeafletDoc(customer: MapLocation, restaurants: MapLocation[]) {
   const dotMarkers: { lat: number; lng: number; label: string; color: string }[] = [
     { lat: customer.lat, lng: customer.lng, label: customer.label ?? "العميل", color: "#E85D04" },
     ...restaurants.map((r) => ({
@@ -42,20 +42,7 @@ function buildLeafletDoc(customer: MapLocation, restaurants: MapLocation[], capt
     )
     .join("\n");
 
-  const captainJs = captain
-    ? `var carIcon = L.divIcon({
-        className: 'captain-car-marker',
-        html: '${escapeJs(captainCarTopIconHtml())}',
-        iconSize: [${CAPTAIN_CAR_ICON_WIDTH}, ${CAPTAIN_CAR_ICON_HEIGHT}],
-        iconAnchor: [${CAPTAIN_CAR_ICON_WIDTH / 2}, ${CAPTAIN_CAR_ICON_HEIGHT / 2}]
-      });
-      L.marker([${captain.lat}, ${captain.lng}], { icon: carIcon, zIndexOffset: 1000 })
-        .addTo(map).bindPopup('${escapeJs(captain.label ?? "الكابتن")}');`
-    : "";
-
-  const allPoints = [...dotMarkers];
-  if (captain) allPoints.push({ lat: captain.lat, lng: captain.lng, label: "", color: "" });
-  const bounds = allPoints.map((p) => `[${p.lat}, ${p.lng}]`).join(", ");
+  const bounds = dotMarkers.map((p) => `[${p.lat}, ${p.lng}]`).join(", ");
 
   return `<!DOCTYPE html>
 <html><head>
@@ -75,20 +62,86 @@ ${leafletLayerToggleHtml()}
 var map = L.map('map', { zoomControl: true });
 ${leafletLayersInitScript()}
 ${dotJs}
-${captainJs}
 map.fitBounds(L.latLngBounds([${bounds}]), { padding: [28, 28], maxZoom: 16 });
+
+var carIcon = L.divIcon({
+  className: 'captain-car-marker',
+  html: '${escapeJs(captainCarTopIconHtml())}',
+  iconSize: [${CAPTAIN_CAR_ICON_WIDTH}, ${CAPTAIN_CAR_ICON_HEIGHT}],
+  iconAnchor: [${CAPTAIN_CAR_ICON_WIDTH / 2}, ${CAPTAIN_CAR_ICON_HEIGHT / 2}]
+});
+var captainMarker = null;
+
+function setCaptain(lat, lng, label) {
+  if (captainMarker) {
+    captainMarker.setLatLng([lat, lng]);
+    captainMarker.setPopupContent(label || 'الكابتن');
+    return;
+  }
+  captainMarker = L.marker([lat, lng], { icon: carIcon, zIndexOffset: 1000 })
+    .addTo(map).bindPopup(label || 'الكابتن');
+}
+
+function clearCaptain() {
+  if (captainMarker) {
+    map.removeLayer(captainMarker);
+    captainMarker = null;
+  }
+}
+
+window.addEventListener('message', function(e) {
+  var d = e.data;
+  if (!d || !d.type) return;
+  if (d.type === 'gostasrv-captain-update' && typeof d.lat === 'number' && typeof d.lng === 'number') {
+    setCaptain(d.lat, d.lng, d.label || 'الكابتن');
+  } else if (d.type === 'gostasrv-captain-clear') {
+    clearCaptain();
+  }
+});
 </script></body></html>`;
 }
 
 export function DeliveryMap({ customer, restaurants = [], captain, height = 220 }: Props) {
-  const srcDoc = useMemo(
-    () => buildLeafletDoc(customer, restaurants, captain),
-    [customer, restaurants, captain]
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const restaurantsKey = useMemo(
+    () => restaurants.map((r) => `${r.lat},${r.lng}`).join("|"),
+    [restaurants]
   );
+
+  const srcDoc = useMemo(
+    () => buildLeafletDoc(customer, restaurants),
+    [customer.lat, customer.lng, restaurantsKey]
+  );
+
+  useEffect(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+
+    const send = () => {
+      if (captain) {
+        win.postMessage(
+          {
+            type: "gostasrv-captain-update",
+            lat: captain.lat,
+            lng: captain.lng,
+            label: captain.label ?? "الكابتن",
+          },
+          "*"
+        );
+      } else {
+        win.postMessage({ type: "gostasrv-captain-clear" }, "*");
+      }
+    };
+
+    send();
+    const t = setTimeout(send, 400);
+    return () => clearTimeout(t);
+  }, [captain?.lat, captain?.lng, captain?.label, captain]);
 
   return (
     <View style={[styles.wrap, { height }]}>
       {createElement("iframe", {
+        ref: iframeRef,
         title: "خريطة التوصيل",
         srcDoc,
         style: {
