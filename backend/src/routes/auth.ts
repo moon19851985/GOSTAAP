@@ -428,6 +428,80 @@ router.post("/resend-code", async (req, res) => {
   res.json({ message: "تم إرسال كود جديد إلى بريدك" });
 });
 
+router.get("/login", (_req, res) => {
+  res.type("html").send(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GOSTAAP — تسجيل الدخول</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #0f1419; color: #e8eaed; margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
+    .card { width: 100%; max-width: 400px; background: #1a2332; border-radius: 12px; padding: 1.5rem; box-shadow: 0 8px 32px rgba(0,0,0,.35); }
+    h1 { margin: 0 0 .25rem; font-size: 1.35rem; }
+    p { margin: 0 0 1.25rem; color: #9aa0a6; font-size: .9rem; }
+    label { display: block; margin-bottom: .35rem; font-size: .85rem; color: #bdc1c6; }
+    input { width: 100%; padding: .65rem .75rem; margin-bottom: 1rem; border: 1px solid #3c4043; border-radius: 8px; background: #0f1419; color: #e8eaed; font-size: 1rem; }
+    button { width: 100%; padding: .75rem; border: none; border-radius: 8px; background: #1a73e8; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    #msg { margin-top: 1rem; font-size: .85rem; line-height: 1.5; word-break: break-word; }
+    .ok { color: #81c995; }
+    .err { color: #f28b82; }
+    a { color: #8ab4f8; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>GOSTAAP API</h1>
+    <p>تسجيل الدخول للاختبار — التطبيق يستخدم نفس المسار بـ POST</p>
+    <form id="f">
+      <label for="email">البريد الإلكتروني</label>
+      <input id="email" name="email" type="email" required autocomplete="username" />
+      <label for="password">كلمة المرور</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password" />
+      <button type="submit" id="btn">دخول</button>
+    </form>
+    <div id="msg"></div>
+    <p style="margin-top:1rem"><a href="/health">فحص الخادم /health</a></p>
+  </div>
+  <script>
+    document.getElementById("f").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("btn");
+      const msg = document.getElementById("msg");
+      btn.disabled = true;
+      msg.className = "";
+      msg.textContent = "جاري التحقق…";
+      try {
+        const r = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("email").value.trim(),
+            password: document.getElementById("password").value,
+          }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          msg.className = "err";
+          msg.textContent = data.error || "فشل تسجيل الدخول";
+          return;
+        }
+        msg.className = "ok";
+        msg.textContent = "تم الدخول — الدور: " + (data.user?.role || "?") + "\\n\\nToken:\\n" + (data.token || "");
+      } catch {
+        msg.className = "err";
+        msg.textContent = "تعذر الاتصال بالخادم";
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>`);
+});
+
 router.post("/login", async (req, res) => {
   const { email, password } = req.body as { email?: string; password?: string };
   if (!email || !password) {
