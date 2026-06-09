@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -25,6 +25,10 @@ const uploadDir = process.env.UPLOAD_DIR ?? path.join(__dirname, "../../uploads"
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const router = Router();
+
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, uploadDir),
@@ -133,7 +137,7 @@ router.patch("/logo", authMiddleware(["RESTAURANT"]), (req, res) => {
   });
 });
 
-function parseProductBody(req: Express.Request, existingMealType?: string) {
+function parseProductBody(req: Request, existingMealType?: string) {
   return {
     name: req.body.name,
     description: req.body.description,
@@ -144,8 +148,8 @@ function parseProductBody(req: Express.Request, existingMealType?: string) {
 }
 
 function saveProductHandler(
-  req: Express.Request,
-  res: Express.Response,
+  req: Request,
+  res: Response,
   existing?: Record<string, unknown>
 ) {
   const restaurant = db.prepare("SELECT id FROM Restaurant WHERE userId = ?").get(req.user!.sub) as
@@ -494,8 +498,8 @@ router.post("/promotions", authMiddleware(["RESTAURANT"]), (req, res) => {
     }
   }
 
-  const restaurant = db.prepare("SELECT id, name FROM Restaurant WHERE userId = ?").get(req.user!.sub) as
-    | { id: string; name: string }
+  const restaurant = db.prepare("SELECT id, name, logoUrl FROM Restaurant WHERE userId = ?").get(req.user!.sub) as
+    | { id: string; name: string; logoUrl: string | null }
     | undefined;
   if (!restaurant) {
     res.status(404).json({ error: "المطعم غير موجود" });
@@ -557,6 +561,7 @@ router.post("/promotions", authMiddleware(["RESTAURANT"]), (req, res) => {
     category: product.category,
     mealType: product.mealType,
     restaurantName: restaurant.name,
+    restaurantLogo: restaurant.logoUrl,
   };
 
   res.status(201).json({ promotion: enrichRestaurantPromotion(row) });
@@ -600,7 +605,13 @@ function loadRestaurantPackageItems(packageId: string) {
 function enrichPackageRow(pkg: Record<string, unknown>) {
   const items = loadRestaurantPackageItems(pkg.id as string);
   const originalPrice = roundMoney(
-    items.reduce((s, i) => s + Number((i as { productPrice: number }).productPrice) * (i as { quantity: number }).quantity, 0)
+    items.reduce(
+      (sum: number, item) =>
+        sum +
+        Number((item as { productPrice: number }).productPrice) *
+          Number((item as { quantity: number }).quantity),
+      0
+    )
   );
   return {
     id: pkg.id,
@@ -1019,7 +1030,7 @@ router.put("/combo-meals/:id", authMiddleware(["RESTAURANT"]), (req, res) => {
     const componentErr = validateComboComponents(
       restaurant.id,
       parsed.data.items,
-      req.params.id
+      routeParam(req.params.id)
     );
     if (componentErr) {
       res.status(400).json({ error: componentErr });
@@ -1030,6 +1041,7 @@ router.put("/combo-meals/:id", authMiddleware(["RESTAURANT"]), (req, res) => {
       ? publicImageUrl(req.file.filename)
       : (existing.imageUrl as string | null);
 
+    const comboId = routeParam(req.params.id);
     const tx = db.transaction(() => {
       db.prepare(
         `UPDATE Product SET name = ?, description = ?, price = ?, imageUrl = ?, category = ?, mealType = ?
@@ -1041,14 +1053,14 @@ router.put("/combo-meals/:id", authMiddleware(["RESTAURANT"]), (req, res) => {
         imageUrl,
         parsed.data.category ?? "وجبات",
         parsed.data.mealType,
-        req.params.id,
+        comboId,
         restaurant.id
       );
-      saveComboItems(req.params.id, parsed.data.items);
+      saveComboItems(comboId, parsed.data.items);
 
       const promo = db
         .prepare(`SELECT id, discountedPrice FROM Promotion WHERE productId = ? AND isActive = 1`)
-        .get(req.params.id) as { id: string; discountedPrice: number } | undefined;
+        .get(comboId) as { id: string; discountedPrice: number } | undefined;
       if (promo && promo.discountedPrice >= roundMoney(parsed.data.price)) {
         db.prepare(`UPDATE Promotion SET isActive = 0 WHERE id = ?`).run(promo.id);
       }
