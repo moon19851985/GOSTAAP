@@ -1,1 +1,46 @@
-
+{
+  "name": "gostasrv-mobile",
+  "version": "0.1.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "prebuild": "expo prebuild --platform android",
+    "prebuild:android": "expo prebuild --platform android --clean",
+    "keystore:generate": "powershell -ExecutionPolicy Bypass -File ./scripts/generate-release-keystore.ps1",
+    "keystore:sha256": "powershell -ExecutionPolicy Bypass -File ./scripts/print-signing-sha256.ps1",
+    "build:release": "cd android && gradlew.bat bundleRelease",
+    "build:release:apk": "cd android && gradlew.bat assembleRelease",
+    "publish:check": "powershell -ExecutionPolicy Bypass -File ./scripts/validate-huawei-publish.ps1",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "expo": "~53.0.9",
+    "expo-asset": "~11.1.7",
+    "expo-constants": "~17.1.6",
+    "expo-device": "~7.1.4",
+    "expo-image-picker": "~16.1.4",
+    "expo-linear-gradient": "~14.1.5",
+    "expo-location": "~18.1.4",
+    "expo-notifications": "~0.31.5",
+    "expo-router": "~5.0.6",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.2",
+    "react-native-maps": "1.20.1",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.10.0",
+    "react-native-web": "^0.20.0",
+    "socket.io-client": "^4.8.1",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.27.1",
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
+  },
+  "private": true
+}
