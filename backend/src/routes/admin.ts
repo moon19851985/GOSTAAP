@@ -2,12 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import { db, cuid } from "../db.js";
 import { authMiddleware } from "../lib/auth.js";
-import { roundMoney } from "../lib/orderFees.js";
 import {
+  roundMoney,
   getCommissionRates,
   setCommissionRates,
   splitCommission,
-} from "../lib/commission.js";
+} from "../lib/orderFees.js";
 
 const router = Router();
 
