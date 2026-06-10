@@ -12,6 +12,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../lib/api";
 import { formatMoney } from "../lib/formatMoney";
 import { formatOrderInvoice } from "../lib/orderInvoice";
+import {
+  formatInvoicePaymentStatus,
+  formatInvoiceTotalLabel,
+  formatPaymentMethodLabel,
+} from "../lib/orderPayment";
 import type { CustomerOrderInvoice } from "../lib/customerOrderInvoice";
 import { showAlert } from "../lib/alert";
 
@@ -81,7 +86,12 @@ export function OrderInvoiceSheet({ visible, orderId, onClose }: Props) {
                   timeZone: "Asia/Riyadh",
                 })}
               </Text>
-              <Text style={styles.meta}>حالة الدفع: تم الدفع</Text>
+              <Text style={styles.meta}>
+                طريقة الدفع: {formatPaymentMethodLabel(invoice.paymentMethod)}
+              </Text>
+              <Text style={styles.meta}>
+                حالة الدفع: {formatInvoicePaymentStatus(invoice.paymentMethod)}
+              </Text>
               <Text style={styles.address}>📍 {invoice.deliveryAddress}</Text>
 
               <Text style={styles.sectionTitle}>الأصناف</Text>
@@ -110,7 +120,9 @@ export function OrderInvoiceSheet({ visible, orderId, onClose }: Props) {
                   </Text>
                 </View>
                 <View style={[styles.totalLine, styles.grandLine]}>
-                  <Text style={styles.grandLabel}>الإجمالي المدفوع</Text>
+                  <Text style={styles.grandLabel}>
+                    {formatInvoiceTotalLabel(invoice.paymentMethod)}
+                  </Text>
                   <Text style={styles.grandValue}>{formatMoney(invoice.total)} ر.س</Text>
                 </View>
               </View>
