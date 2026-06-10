@@ -2,6 +2,11 @@ import { Platform } from "react-native";
 import { formatMoney } from "./formatMoney";
 import { showAlert } from "./alert";
 import { formatOrderInvoice } from "./orderInvoice";
+import {
+  formatInvoicePaymentStatus,
+  formatInvoiceTotalLabel,
+  formatPaymentMethodLabel,
+} from "./orderPayment";
 
 export type CustomerInvoiceItem = {
   productName: string;
@@ -15,6 +20,7 @@ export type CustomerOrderInvoice = {
   orderId: string;
   invoiceNumber?: string | null;
   status: string;
+  paymentMethod?: string | null;
   createdAt: string;
   deliveryAddress: string;
   subtotal: number;
@@ -41,6 +47,9 @@ function buildInvoiceHtml(data: CustomerOrderInvoice) {
     .join("");
 
   const invoiceLine = formatOrderInvoice(data.invoiceNumber) ?? "—";
+  const paymentStatus = formatInvoicePaymentStatus(data.paymentMethod);
+  const totalLabel = formatInvoiceTotalLabel(data.paymentMethod);
+  const methodLabel = formatPaymentMethodLabel(data.paymentMethod);
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -63,7 +72,8 @@ function buildInvoiceHtml(data: CustomerOrderInvoice) {
   <div class="meta">
     <div><strong>رقم الفاتورة:</strong> ${invoiceLine}</div>
     <div><strong>التاريخ:</strong> ${formatPrintDate(data.createdAt)}</div>
-    <div><strong>حالة الدفع:</strong> تم الدفع</div>
+    <div><strong>طريقة الدفع:</strong> ${methodLabel}</div>
+    <div><strong>حالة الدفع:</strong> ${paymentStatus}</div>
     <div><strong>عنوان التوصيل:</strong> ${data.deliveryAddress}</div>
   </div>
   <table>
@@ -80,7 +90,7 @@ function buildInvoiceHtml(data: CustomerOrderInvoice) {
   <div class="totals">
     <div>إجمالي الطلب: ${formatMoney(data.subtotal)} ر.س</div>
     <div>أجرة التوصيل: ${formatMoney(data.deliveryFee)} ر.س</div>
-    <div class="grand">الإجمالي المدفوع: ${formatMoney(data.total)} ر.س</div>
+    <div class="grand">${totalLabel}: ${formatMoney(data.total)} ر.س</div>
   </div>
 </body>
 </html>`;
