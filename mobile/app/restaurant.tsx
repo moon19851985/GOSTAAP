@@ -31,6 +31,7 @@ type PartyInfo = { name: string; phone: string | null; vehicle?: string | null }
 type IncomingOrder = {
   id: string;
   invoiceNumber?: string | null;
+  paymentMethod?: string | null;
   status: string;
   total: number;
   subtotal?: number;
@@ -194,6 +195,7 @@ export default function RestaurantScreen() {
     printRestaurantInvoice({
       restaurantName,
       invoiceNumber: order.invoiceNumber,
+      paymentMethod: order.paymentMethod,
       orderId: order.id,
       createdAt: order.createdAt,
       deliveryAddress: order.deliveryAddress,
