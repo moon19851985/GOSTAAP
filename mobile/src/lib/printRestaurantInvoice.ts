@@ -1,6 +1,11 @@
 import { Platform } from "react-native";
 import { formatMoney } from "./formatMoney";
 import { showAlert } from "./alert";
+import {
+  formatInvoicePaymentStatus,
+  formatInvoiceTotalLabel,
+  formatPaymentMethodLabel,
+} from "./orderPayment";
 
 export type RestaurantInvoiceItem = {
   productName: string;
@@ -12,6 +17,7 @@ export type RestaurantInvoicePrintData = {
   restaurantName: string;
   invoiceNumber?: string | null;
   orderId: string;
+  paymentMethod?: string | null;
   createdAt?: string;
   deliveryAddress: string;
   customerName?: string;
@@ -42,6 +48,9 @@ function buildInvoiceHtml(data: RestaurantInvoicePrintData) {
   const invoiceLine = data.invoiceNumber?.trim()
     ? data.invoiceNumber.trim()
     : "—";
+  const paymentStatus = formatInvoicePaymentStatus(data.paymentMethod);
+  const totalLabel = formatInvoiceTotalLabel(data.paymentMethod);
+  const methodLabel = formatPaymentMethodLabel(data.paymentMethod);
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -65,7 +74,8 @@ function buildInvoiceHtml(data: RestaurantInvoicePrintData) {
   <div class="meta">
     <div><strong>رقم الفاتورة:</strong> ${invoiceLine}</div>
     <div><strong>التاريخ:</strong> ${formatPrintDate(data.createdAt)}</div>
-    <div><strong>حالة الدفع:</strong> تم الدفع</div>
+    <div><strong>طريقة الدفع:</strong> ${methodLabel}</div>
+    <div><strong>حالة الدفع:</strong> ${paymentStatus}</div>
     <div><strong>العميل:</strong> ${data.customerName ?? "—"}${data.customerPhone ? ` — ${data.customerPhone}` : ""}</div>
     <div><strong>عنوان التوصيل:</strong> ${data.deliveryAddress}</div>
   </div>
@@ -82,7 +92,7 @@ function buildInvoiceHtml(data: RestaurantInvoicePrintData) {
   <div class="totals">
     <div>مجموع أصناف المطعم: ${formatMoney(data.subtotal)} ر.س</div>
     <div>أجرة التوصيل: ${formatMoney(data.deliveryFee)} ر.س</div>
-    <div class="grand">إجمالي المبلغ المدفوع: ${formatMoney(data.total)} ر.س</div>
+    <div class="grand">${totalLabel}: ${formatMoney(data.total)} ر.س</div>
   </div>
 </body>
 </html>`;
