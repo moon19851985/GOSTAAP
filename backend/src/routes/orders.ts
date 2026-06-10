@@ -543,6 +543,7 @@ router.get("/:id/invoice", authMiddleware(["CUSTOMER"]), (req, res) => {
     orderId: locked.id,
     invoiceNumber: (locked.invoiceNumber as string | null) ?? null,
     status: locked.status,
+    paymentMethod: getOrderPaymentMethod(routeParam(req.params.id)),
     createdAt: locked.createdAt,
     deliveryAddress: locked.deliveryAddress,
     subtotal: locked.subtotal,
@@ -623,6 +624,7 @@ function enrichRestaurantOrder(
   const captainId = order.captainId ?? null;
   return attachLockedOrderMoney({
     ...order,
+    paymentMethod: getOrderPaymentMethod(order.id),
     items: db
       .prepare(
         `SELECT oi.*, p.name as productName FROM OrderItem oi JOIN Product p ON p.id = oi.productId WHERE oi.orderId = ? AND oi.restaurantId = ?`
