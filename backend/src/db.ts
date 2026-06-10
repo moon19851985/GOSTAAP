@@ -130,7 +130,18 @@ export function initDb() {
   migrateOrderDispatch();
   migrateCaptainPushToken();
   migratePayoutRecord();
+  migrateAppSettings();
   migrateUserPhoneUnique();
+}
+
+function migrateAppSettings() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS AppSetting (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updatedAt TEXT DEFAULT (datetime('now'))
+    );
+  `);
 }
 
 function migrateUserPhoneUnique() {
